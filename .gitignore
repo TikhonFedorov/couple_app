@@ -1,0 +1,15 @@
+# Секреты и настройки среды
+.env
+*.env
+
+# Файлы БД
+*.db
+
+# Лог файлы
+*.log
+
+# node_modules для React (если frontend в том же репозитории)
+frontend/node_modules/
+
+# build папка React (если вы не храните в repo)
+frontend/build/

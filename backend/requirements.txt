@@ -1,0 +1,8 @@
+Flask==2.3.2
+Flask-SQLAlchemy==3.0.5
+Flask-CORS==4.0.0
+Flask-Login==0.6.2
+Flask_Sessions=0.8.0
+Werkzeug==2.3.6
+python-dotenv
+requests
