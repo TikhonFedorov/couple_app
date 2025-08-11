@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Box, Button, TextField, Typography, Paper, Alert } from '@mui/material';
+import { Box, Button, TextField, Typography, Paper, Alert, Link } from '@mui/material';
 import { authAPI } from '../services/api';
 
-function LoginPage({ onLoginSuccess }) {
+function LoginPage({ onLoginSuccess, onShowRegister }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
@@ -53,6 +53,19 @@ function LoginPage({ onLoginSuccess }) {
             Войти
           </Button>
         </form>
+        <Box mt={2} textAlign="center">
+          <Typography variant="body2">
+            Нет аккаунта?{' '}
+            <Link
+              component="button"
+              variant="body2"
+              onClick={onShowRegister}
+              sx={{ cursor: 'pointer' }}
+            >
+              Зарегистрируйтесь
+            </Link>
+          </Typography>
+        </Box>
       </Paper>
     </Box>
   );

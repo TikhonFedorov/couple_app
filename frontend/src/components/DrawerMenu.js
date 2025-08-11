@@ -23,7 +23,7 @@ function DrawerMenu({ open, onClose, onNavigate, onLogout, onToggleTheme, user, 
     <Drawer anchor="left" open={open} onClose={onClose}>
       <Box sx={{ width: 250 }} role="presentation" onClick={onClose} onKeyDown={onClose}>
         <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
-          <Avatar src={user.avatarUrl} alt={user.name} />
+          <Avatar src={user.avatar_url || user.avatarUrl} alt={user.name} />
           <Box>
             <Typography variant="subtitle1">{user.name || 'User Name'}</Typography>
             <Typography

@@ -1,5 +1,6 @@
 import axios from 'axios';
 
+// Используйте относительный путь, чтобы работать и локально, и на сервере
 const API_BASE_URL = 'http://localhost:5000/api';
 
 const api = axios.create({
@@ -11,6 +12,7 @@ export const authAPI = {
   register: (data) => api.post('/register', data),
   login: (data) => api.post('/login', data),
   logout: () => api.post('/logout'),
+  getCouples: () => api.get('/couples'),  // <-- Добавьте сюда
 };
 
 export const profileAPI = {

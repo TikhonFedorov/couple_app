@@ -4,7 +4,7 @@
 body {
   margin: 0;
   font-family: 'Roboto', 'Helvetica', 'Arial', sans-serif;
-  background-color: #f5f5f5;
+  background-color: var(--background-color); /* Использование переменной */
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -15,37 +15,49 @@ body {
   padding-bottom: 40px;
 }
 
-/* Стили заголовков вкладок */
-h5 {
-  margin: 0;
-  padding-bottom: 10px;
-}
-
-/* Отступы для элементов списка и карточек */
-.MuiList-root {
-  background: white;
-}
-
-.MuiPaper-root {
-  padding: 10px;
-  margin-bottom: 15px;
-}
-
-/* Стили для кнопок */
-button {
-  text-transform: none;
-}
-
-/* Стили диалоговых окон */
-.MuiDialogContent-root {
-  padding-top: 10px;
-  padding-bottom: 10px;
-}
-
 /* Адаптивность - контейнер центрируется и ограничивает ширину на больших экранах */
 @media (min-width: 960px) {
   .MuiContainer-root {
     max-width: 720px;
     margin: auto;
   }
+}
+
+/* Стили заголовков вкладок */
+h5 {
+  margin: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #ddd; /* Добавлен разделитель для визуального акцента */
+}
+
+/* Отступы для элементов списка и карточек */
+.MuiList-root {
+  background: white;
+  border-radius: 8px; /* Добавлен радиус для современного вида */
+}
+
+.MuiPaper-root {
+  padding: 10px;
+  margin-bottom: 15px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1); /* Тень для глубины */
+}
+
+/* Стили для кнопок */
+button {
+  text-transform: none;
+  padding: 8px 16px; /* Уточнены отступы */
+  transition: background-color 0.3s ease; /* Эффект плавности */
+}
+button:hover {
+  background-color: #f0f0f0; /* Цвет при наведении */
+}
+
+/* Стили диалоговых окон */
+.MuiDialogContent-root {
+  padding: 10px 20px; /* Унифицированы отступы */
+}
+
+/* Переменные CSS для удобства */
+:root {
+  --background-color: #f5f5f5;
 }

@@ -1,59 +1,80 @@
 import os
+from datetime import timedelta
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify, make_response
+from flask import Flask, request, jsonify, make_response, send_from_directory
 from flask_cors import CORS
-from flask_session import Session
 from flask_login import LoginManager, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
-from models import db, User, Couple, TodoItem, WishlistItem, MenuItem, Dish
+from models import db, User, Couple, TodoItem, WishlistItem, MenuItem, Dish, Couple
 
-# Загружаем переменные окружения из .env файла
+# Основная директория и настройка окружения
+BASE_DIR = os.path.abspath(os.path.dirname(__file__))
+os.makedirs(os.path.join(BASE_DIR, 'instance'), exist_ok=True)
 load_dotenv()
 
 app = Flask(__name__, instance_relative_config=True)
 
-# Конфигурация приложения из .env
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'default_secret_key')
-app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///instance/database.db')
-app.config['SESSION_TYPE'] = 'filesystem'
-app.config['SESSION_PERMANENT'] = False  # Сессии удаляются при закрытии браузера
-app.config['SESSION_USE_SIGNER'] = True  # Доп. безопасность для cookies
-app.config['SESSION_COOKIE_SAMESITE'] = os.getenv('SESSION_COOKIE_SAMESITE', 'Lax')
-app.config['SESSION_COOKIE_SECURE'] = os.getenv('SESSION_COOKIE_SECURE', 'False') == 'True'
+# Конфигурация базы данных
+db_file = os.getenv('DATABASE_URL') or f"sqlite:///{os.path.join(BASE_DIR, 'instance', 'database.db')}"
+app.config['SQLALCHEMY_DATABASE_URI'] = db_file
 
-# Инициализация расширений
-Session(app)
+# Настройки безопасности и сессий
+app.config.update({
+    'SECRET_KEY': os.getenv('SECRET_KEY', 'default_secret_key'),
+    # Для продакшена рекомендуется использовать True при использовании HTTPS
+    'REMEMBER_COOKIE_SECURE': True,
+    'SESSION_COOKIE_SAMESITE': 'Lax',  # Более безопасный вариант по сравнению с None
+    'SESSION_COOKIE_SECURE': True,     # Требует HTTPS
+    'PERMANENT_SESSION_LIFETIME': timedelta(days=30)
+})
+
 db.init_app(app)
 
+def remove_orphan_couples():
+    # Предполагается, что в модели Couple есть отношение users к User
+    orphan_couples = Couple.query.filter(~Couple.users.any()).all()
+    count = len(orphan_couples)
+    for couple in orphan_couples:
+        db.session.delete(couple)
+    db.session.commit()
+    print(f'Removed {count} orphan Couple(s) from database.')
+
+# Оптимизированная конфигурация CORS
 CORS(
     app,
-    resources={r"/api/*": {"origins": "http://localhost:3000"}},  # измените origin под адрес фронтенда
+    resources={r"/api/*": {"origins": "http://localhost:3000"}},
     supports_credentials=True,
+    allow_headers=["Content-Type", "Authorization"],
+    methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"]
 )
 
+# Инициализация менеджера аутентификации
 login_manager = LoginManager()
 login_manager.init_app(app)
-
 
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
-
 @login_manager.unauthorized_handler
 def unauthorized():
     return jsonify({'error': 'Authentication required'}), 401
 
-
 @app.before_request
 def handle_options_request():
+    """Упрощённый обработчик предварительных запросов CORS"""
     if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', 'http://localhost:3000')  # фронтенд
-        response.headers.add('Access-Control-Allow-Headers', 'Content-Type,Authorization')
-        response.headers.add('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
-        response.headers.add('Access-Control-Allow-Credentials', 'true')
-        return response, 200
+        return make_response('', 200)
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_frontend(path):
+    """Обслуживание фронтенда из статической директории"""
+    build_dir = os.path.join(app.root_path, '..', 'frontend', 'static')
+    if path != "" and os.path.exists(os.path.join(build_dir, path)):
+        return send_from_directory(build_dir, path)
+    else:
+        return send_from_directory(build_dir, 'index.html')
 
 # Регистрация
 @app.route('/api/register', methods=['POST'])
@@ -61,14 +82,27 @@ def register():
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
-    couple_name = data.get('couple_name') or f"Пара {username}"
 
     if User.query.filter_by(username=username).first():
         return jsonify({'error': 'Пользователь уже существует'}), 400
 
-    couple = Couple(name=couple_name)
-    db.session.add(couple)
-    db.session.commit()
+    couple_id = data.get('couple_id')
+    couple_name = data.get('couple_name')
+
+    if couple_id:
+        couple = Couple.query.get(couple_id)
+        if not couple:
+            return jsonify({'error': 'Пара не найдена'}), 400
+
+        # Проверяем число пользователей в паре
+        users_count = User.query.filter_by(couple_id=couple_id).count()
+        if users_count >= 2:
+            return jsonify({'error': 'В этой паре уже зарегистрировано 2 пользователя'}), 400
+    else:
+        # Создаем новую пару
+        couple = Couple(name=couple_name or f"Пара {username}")
+        db.session.add(couple)
+        db.session.commit()
 
     user = User(
         username=username,
@@ -78,28 +112,43 @@ def register():
         email=data.get('email', ''),
         avatar_url=data.get('avatar_url', ''),
         description=data.get('description', ''),
-        skills=','.join(data.get('skills', [])),
-        about='|'.join(data.get('about', []))
+        skills=','.join(data.get('skills', [])) if isinstance(data.get('skills'), list) else data.get('skills', ''),
+        about='|'.join(data.get('about', [])) if isinstance(data.get('about'), list) else data.get('about', '')
     )
     db.session.add(user)
     db.session.commit()
 
-    login_user(user)
+    login_user(user, remember=True)
     return jsonify({'message': 'Регистрация успешна', 'user_id': user.id})
+
+@app.route('/api/couples', methods=['GET'])
+def get_couples():
+    couples = Couple.query.all()
+    return jsonify([{'id': c.id, 'name': c.name} for c in couples])
 
 # Вход
 @app.route('/api/login', methods=['POST'])
 def login():
     data = request.get_json()
+    if not data:
+        return jsonify({'error': 'Отсутствуют данные'}), 400
+
     username = data.get('username')
     password = data.get('password')
 
+    if not username or not password:
+        return jsonify({'error': 'Не указан логин или пароль'}), 400
+
     user = User.query.filter_by(username=username).first()
 
-    if user and check_password_hash(user.password, password):
-        login_user(user)
-        return jsonify({'message': 'Вход выполнен', 'user_id': user.id})
-    return jsonify({'error': 'Неверные данные'}), 401
+    if not user:
+        return jsonify({'error': 'Пользователь не найден'}), 401
+
+    if not check_password_hash(user.password, password):
+        return jsonify({'error': 'Неверный пароль'}), 401
+
+    login_user(user, remember=True)
+    return jsonify({'message': 'Вход выполнен', 'user_id': user.id})
 
 # Выход
 @app.route('/api/logout', methods=['POST'])
@@ -259,7 +308,6 @@ def wishlist_item(wish_id):
 def menu():
     if request.method == 'GET':
         menu_items = MenuItem.query.filter_by(couple_id=current_user.couple_id).all()
-        # Возвращаем dish_id, день недели, прием пищи, plus created_by_name
         return jsonify([{
             'id': m.id,
             'dish_id': m.dish_id,
@@ -312,7 +360,7 @@ def menu_item(menu_id):
         db.session.delete(menu_item)
         db.session.commit()
         return jsonify({'message': 'Блюдо удалено'})
-    
+
 @app.route('/api/dishes', methods=['GET', 'POST'])
 @login_required
 def dishes():
@@ -340,4 +388,5 @@ def dishes():
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-    app.run(debug=True)
+        remove_orphan_couples()
+    app.run(host='0.0.0.0')

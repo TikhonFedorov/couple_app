@@ -13,3 +13,5 @@ frontend/node_modules/
 
 # build папка React (если вы не храните в repo)
 frontend/build/
+
+backend/flask_session
